@@ -1,0 +1,23 @@
+{
+  "targetUrl": "",
+  "chaos": {
+    "enabled": false,
+    "delayMs": 0,
+    "failureRate": 0,
+    "failureStatus": 500,
+    "dropConnection": false
+  },
+  "mocks": [
+    {
+      "id": "mock_default_1",
+      "enabled": true,
+      "method": "GET",
+      "path": "/api/health",
+      "status": 200,
+      "responseBody": {
+        "status": "ok",
+        "message": "Mock server is running smoothly"
+      }
+    }
+  ]
+}

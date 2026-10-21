@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Production builds
+dist/
+build/
+
+# Environment variables
+.env
+.env.*
+
+# Local data (config state)
+server/data/config.json
+
+# Logs & temporary files
+*.log
+.DS_Store
+Thumbs.db
