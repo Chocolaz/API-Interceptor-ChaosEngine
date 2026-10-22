@@ -14,5 +14,6 @@ server/data/config.json
 
 # Logs & temporary files
 *.log
+*.tsbuildinfo
 .DS_Store
 Thumbs.db
