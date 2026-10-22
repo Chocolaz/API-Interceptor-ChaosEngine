@@ -12,9 +12,12 @@ export interface MockRoute {
   id: string;               // UUID or timestamp string (e.g., "mock_1700000001")
   enabled: boolean;         // Toggle mock without deleting
   method: HttpMethod;
-  path: string;             // Must start with "/", e.g., "/api/v1/users"
+  path: string;             // Must start with "/", e.g., "/api/v1/users" or "/api/users/:id"
   status: number;           // Default: 200
   responseBody: any;        // Parsed JSON object or array
+  delayMs?: number;         // Custom route delay in ms (optional)
+  queryParams?: Record<string, string>; // Expected query params (optional)
+  headers?: Record<string, string>;     // Expected request headers (optional)
 }
 
 export interface AppConfig {

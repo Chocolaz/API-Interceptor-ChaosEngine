@@ -14,17 +14,13 @@
 
 ---
 
-## Phase 2: Advanced Capabilities (Backlog ⏳)
+## Phase 2: Advanced Capabilities (Completed ✅)
 
-### 1. Dynamic Path Parameters & Wildcard Matching
-- **Syntax:** `/api/users/:id`, `/api/orders/:orderId/items`, `/api/files/*`
-- **Behavior:** Match parameterized URLs and extract route parameters.
-- **Priority:** High
-
-### 2. Mock Response Delay Per Route
-- **Feature:** Configure custom latency on individual mock routes (independent of global chaos delay).
-- **Priority:** Medium
-
-### 3. Header & Query Parameter Matching
-- **Feature:** Match mock routes not just by Path and Method, but also by specific Request Headers or Query Parameters.
-- **Priority:** Low
+- [x] **Dynamic Path Parameters & Wildcard Matching**
+  - Syntax: `/api/users/:id`, `/api/orders/:orderId/items`, `/api/files/*`
+  - Zero-dependency regex extraction with static exact-match priority.
+- [x] **Mock Response Delay Per Route**
+  - Configure custom latency on individual mock routes (`delayMs`), independent of global chaos settings.
+- [x] **Header & Query Parameter Matching**
+  - Match mock routes conditionally by expected Request Headers and/or Query Parameters.
+  - Interactive rule builder in web dashboard modal with visual indicators in route list.

@@ -56,3 +56,60 @@ export function findFuzzyHints(
   const unique = Array.from(new Set(filtered.map((item) => item.label)));
   return unique.slice(0, maxLimit);
 }
+
+/**
+ * Normalizes route path by removing trailing slash (unless root).
+ */
+export function normalizePath(p: string): string {
+  if (!p || p === '/') return '/';
+  const stripped = p.replace(/\/+$/, '');
+  return stripped.startsWith('/') ? stripped : `/${stripped}`;
+}
+
+/**
+ * Matches a mock route pattern (with :param and * wildcard support) against an actual request path.
+ */
+export function matchRoutePattern(
+  pattern: string,
+  actualPath: string
+): { matches: boolean; params: Record<string, string> } {
+  const normPattern = normalizePath(pattern);
+  const normPath = normalizePath(actualPath);
+
+  // Fast path: exact match
+  if (normPattern === normPath) {
+    return { matches: true, params: {} };
+  }
+
+  // If pattern has no dynamic parts (: or *), not a match
+  if (!normPattern.includes(':') && !normPattern.includes('*')) {
+    return { matches: false, params: {} };
+  }
+
+  const paramNames: string[] = [];
+  const segments = normPattern.split('/');
+  const regexSegments = segments.map((seg) => {
+    if (seg.startsWith(':')) {
+      paramNames.push(seg.slice(1));
+      return '([^/]+)';
+    }
+    if (seg === '*') {
+      paramNames.push('*');
+      return '(.*)';
+    }
+    return seg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  });
+
+  const regex = new RegExp(`^${regexSegments.join('/')}$`);
+  const match = normPath.match(regex);
+  if (!match) {
+    return { matches: false, params: {} };
+  }
+
+  const params: Record<string, string> = {};
+  paramNames.forEach((name, index) => {
+    params[name] = match[index + 1] || '';
+  });
+
+  return { matches: true, params };
+}

@@ -2,8 +2,8 @@ import express, { Request, Response, NextFunction } from 'express';
 import http, { IncomingMessage, ServerResponse } from 'http';
 import { createProxyMiddleware, fixRequestBody } from 'http-proxy-middleware';
 import { store } from './store';
-import { findFuzzyHints } from './fuzzy';
-import { TrafficLog } from './types';
+import { findFuzzyHints, matchRoutePattern } from './fuzzy';
+import { TrafficLog, MockRoute } from './types';
 
 export interface ProxyServerOptions {
   port?: number;
@@ -133,14 +133,53 @@ export class ProxyIngressServer {
         }
       }
 
-      // Step 3: Mock Route Matching
-      const matchedMock = state.mocks.find((mock) => {
+      // Step 3: Mock Route Matching with Dynamic Parameters & Condition Filtering
+      const checkConditions = (mock: MockRoute): boolean => {
+        // Query params matching
+        if (mock.queryParams && Object.keys(mock.queryParams).length > 0) {
+          for (const [key, expectedVal] of Object.entries(mock.queryParams)) {
+            if (String(query[key] ?? '') !== String(expectedVal)) {
+              return false;
+            }
+          }
+        }
+        // Header matching
+        if (mock.headers && Object.keys(mock.headers).length > 0) {
+          for (const [key, expectedVal] of Object.entries(mock.headers)) {
+            const actualVal = req.headers[key.toLowerCase()];
+            if (String(actualVal ?? '') !== String(expectedVal)) {
+              return false;
+            }
+          }
+        }
+        return true;
+      };
+
+      // 1. Try exact match first
+      let matchedMock = state.mocks.find((mock) => {
         if (!mock.enabled) return false;
         if (mock.method !== reqMethod) return false;
-        return normalizePath(mock.path) === reqPath;
+        if (normalizePath(mock.path) !== reqPath) return false;
+        return checkConditions(mock);
       });
 
+      // 2. If no exact match, try dynamic path pattern (:param and *)
+      if (!matchedMock) {
+        matchedMock = state.mocks.find((mock) => {
+          if (!mock.enabled) return false;
+          if (mock.method !== reqMethod) return false;
+          const matchResult = matchRoutePattern(mock.path, reqPath);
+          if (!matchResult.matches) return false;
+          return checkConditions(mock);
+        });
+      }
+
       if (matchedMock) {
+        // Apply custom route latency if configured
+        if (matchedMock.delayMs && matchedMock.delayMs > 0) {
+          await new Promise((r) => setTimeout(r, matchedMock.delayMs));
+        }
+
         const durationMs = Date.now() - startTime;
         this.emitLog({
           id: generateLogId(),

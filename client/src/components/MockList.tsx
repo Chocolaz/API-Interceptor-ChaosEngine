@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Search, Edit2, Trash2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, CheckCircle2, AlertCircle, Clock, Filter } from 'lucide-react';
 import { HttpMethod, MockRoute } from '../types';
 
 interface MockListProps {
@@ -167,6 +167,50 @@ export default function MockList({
                 >
                   {mock.status}
                 </span>
+
+                {/* Dynamic Path Parameter Badge */}
+                {(mock.path.includes(':') || mock.path.includes('*')) && (
+                  <span
+                    className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/30 shrink-0"
+                    title="Dynamic Route (:param / * wildcard)"
+                  >
+                    PARAM
+                  </span>
+                )}
+
+                {/* Custom Delay Badge */}
+                {Boolean(mock.delayMs && mock.delayMs > 0) && (
+                  <span
+                    className="flex items-center gap-1 text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30 shrink-0"
+                    title={`Custom Route Delay: ${mock.delayMs}ms`}
+                  >
+                    <Clock className="w-3 h-3" />
+                    <span>{mock.delayMs}ms</span>
+                  </span>
+                )}
+
+                {/* Conditions / Rules Badge */}
+                {Boolean(
+                  (mock.queryParams && Object.keys(mock.queryParams).length > 0) ||
+                    (mock.headers && Object.keys(mock.headers).length > 0)
+                ) && (
+                  <span
+                    className="flex items-center gap-1 text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/30 shrink-0"
+                    title={`Conditions: ${[
+                      mock.queryParams && Object.keys(mock.queryParams).length > 0
+                        ? `${Object.keys(mock.queryParams).length} query`
+                        : '',
+                      mock.headers && Object.keys(mock.headers).length > 0
+                        ? `${Object.keys(mock.headers).length} header`
+                        : '',
+                    ]
+                      .filter(Boolean)
+                      .join(', ')}`}
+                  >
+                    <Filter className="w-3 h-3" />
+                    <span>rules</span>
+                  </span>
+                )}
               </div>
 
               {/* Action Buttons: Edit and Delete */}

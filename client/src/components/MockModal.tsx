@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, AlertCircle, Sparkles, Plus, Trash2, Code2, SlidersHorizontal } from 'lucide-react';
+import { X, AlertCircle, Sparkles, Plus, Trash2, Code2, SlidersHorizontal, ChevronDown, ChevronRight, Clock, Filter } from 'lucide-react';
 import { HttpMethod, MockRoute } from '../types';
 
 interface MockModalProps {
@@ -18,6 +18,12 @@ interface VisualField {
   id: string;
   key: string;
   type: 'string' | 'number' | 'boolean' | 'null';
+  value: string;
+}
+
+interface KeyValPair {
+  id: string;
+  key: string;
   value: string;
 }
 
@@ -138,6 +144,10 @@ export default function MockModal({
   const [method, setMethod] = useState<HttpMethod>('GET');
   const [path, setPath] = useState('');
   const [status, setStatus] = useState<number>(200);
+  const [delayMs, setDelayMs] = useState<number>(0);
+  const [queryParamsList, setQueryParamsList] = useState<KeyValPair[]>([]);
+  const [headersList, setHeadersList] = useState<KeyValPair[]>([]);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [responseBodyText, setResponseBodyText] = useState('{\n  "message": "success"\n}');
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -152,6 +162,25 @@ export default function MockModal({
       setMethod(initialMock.method);
       setPath(initialMock.path);
       setStatus(initialMock.status);
+      setDelayMs(initialMock.delayMs ?? 0);
+      const qp = initialMock.queryParams
+        ? Object.entries(initialMock.queryParams).map(([k, v], idx) => ({
+            id: `qp_${idx}_${Date.now()}`,
+            key: k,
+            value: v,
+          }))
+        : [];
+      setQueryParamsList(qp);
+      const hdrs = initialMock.headers
+        ? Object.entries(initialMock.headers).map(([k, v], idx) => ({
+            id: `hdr_${idx}_${Date.now()}`,
+            key: k,
+            value: v,
+          }))
+        : [];
+      setHeadersList(hdrs);
+      setShowAdvanced(qp.length > 0 || hdrs.length > 0 || Boolean(initialMock.delayMs && initialMock.delayMs > 0));
+
       const str = JSON.stringify(initialMock.responseBody, null, 2);
       setResponseBodyText(str);
       setVisualFields(objToFields(initialMock.responseBody));
@@ -160,6 +189,11 @@ export default function MockModal({
       setMethod(defaultMethod || 'GET');
       setPath(defaultPath || '');
       setStatus(200);
+      setDelayMs(0);
+      setQueryParamsList([]);
+      setHeadersList([]);
+      setShowAdvanced(false);
+
       if (defaultResponseBody !== undefined) {
         const str =
           typeof defaultResponseBody === 'object'
@@ -292,6 +326,18 @@ export default function MockModal({
       normalizedPath = `/${normalizedPath}`;
     }
 
+    const queryParamsObj: Record<string, string> = {};
+    queryParamsList.forEach((item) => {
+      const k = item.key.trim();
+      if (k) queryParamsObj[k] = item.value;
+    });
+
+    const headersObj: Record<string, string> = {};
+    headersList.forEach((item) => {
+      const k = item.key.trim();
+      if (k) headersObj[k.toLowerCase()] = item.value;
+    });
+
     setIsSaving(true);
     try {
       await onSave(
@@ -301,6 +347,9 @@ export default function MockModal({
           status: Number(status) || 200,
           responseBody: parsedBody,
           enabled: initialMock ? initialMock.enabled : true,
+          delayMs: delayMs > 0 ? Number(delayMs) : undefined,
+          queryParams: Object.keys(queryParamsObj).length > 0 ? queryParamsObj : undefined,
+          headers: Object.keys(headersObj).length > 0 ? headersObj : undefined,
         },
         initialMock?.id
       );
@@ -333,8 +382,8 @@ export default function MockModal({
 
         {/* Modal Body */}
         <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-4 overflow-y-auto">
-          {/* Method & Status Code */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Method, Status Code, & Latency */}
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-medium text-slate-400 mb-1">HTTP Method</label>
               <select
@@ -362,21 +411,200 @@ export default function MockModal({
                 className="w-full bg-slate-950 border border-slate-800 text-sm text-slate-200 rounded-lg px-3 py-2 font-mono focus:border-indigo-500 focus:outline-none"
               />
             </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1 flex items-center gap-1">
+                <Clock className="w-3 h-3 text-slate-500" />
+                <span>Delay (ms)</span>
+              </label>
+              <input
+                type="number"
+                min={0}
+                step={50}
+                value={delayMs}
+                onChange={(e) => setDelayMs(Math.max(0, Number(e.target.value) || 0))}
+                placeholder="0"
+                className="w-full bg-slate-950 border border-slate-800 text-sm text-slate-200 rounded-lg px-3 py-2 font-mono focus:border-indigo-500 focus:outline-none"
+              />
+            </div>
           </div>
 
           {/* Path Input */}
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1">
-              Route Path <span className="text-slate-500 text-[11px]">(e.g., /api/v1/users)</span>
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-medium text-slate-400">
+                Route Path
+              </label>
+              <span className="text-[11px] text-indigo-400 font-mono">
+                Supports :param & * wildcards
+              </span>
+            </div>
             <input
               type="text"
               value={path}
               onChange={(e) => setPath(e.target.value)}
-              placeholder="/api/users"
+              placeholder="/api/users/:id or /api/files/*"
               required
               className="w-full bg-slate-950 border border-slate-800 text-sm font-mono text-slate-200 rounded-lg px-3 py-2 focus:border-indigo-500 focus:outline-none"
             />
+          </div>
+
+          {/* Advanced Matching: Query Params & Headers */}
+          <div className="border border-slate-800/80 rounded-lg overflow-hidden bg-slate-950/40">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="w-full flex items-center justify-between px-3.5 py-2.5 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Filter className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Matching Conditions (Query & Headers)</span>
+                {(queryParamsList.length > 0 || headersList.length > 0) && (
+                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                    {queryParamsList.length + headersList.length} active
+                  </span>
+                )}
+              </div>
+              {showAdvanced ? (
+                <ChevronDown className="w-4 h-4 text-slate-400" />
+              ) : (
+                <ChevronRight className="w-4 h-4 text-slate-400" />
+              )}
+            </button>
+
+            {showAdvanced && (
+              <div className="p-3.5 border-t border-slate-800/60 flex flex-col gap-4 bg-slate-950/80">
+                {/* Query Parameters */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+                      Expected Query Parameters
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setQueryParamsList((prev) => [
+                          ...prev,
+                          { id: `qp_${Date.now()}`, key: '', value: '' },
+                        ])
+                      }
+                      className="flex items-center gap-1 text-[11px] text-indigo-400 hover:text-indigo-300 font-medium"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Add Param</span>
+                    </button>
+                  </div>
+
+                  {queryParamsList.length === 0 ? (
+                    <p className="text-[11px] text-slate-600 italic">No query parameter constraints (matches all query strings)</p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {queryParamsList.map((item) => (
+                        <div key={item.id} className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            placeholder="param_name (e.g. role)"
+                            value={item.key}
+                            onChange={(e) =>
+                              setQueryParamsList((prev) =>
+                                prev.map((q) => (q.id === item.id ? { ...q, key: e.target.value } : q))
+                              )
+                            }
+                            className="flex-1 bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-200 font-mono focus:border-indigo-500 focus:outline-none"
+                          />
+                          <span className="text-slate-600 text-xs font-mono">=</span>
+                          <input
+                            type="text"
+                            placeholder="expected value (e.g. admin)"
+                            value={item.value}
+                            onChange={(e) =>
+                              setQueryParamsList((prev) =>
+                                prev.map((q) => (q.id === item.id ? { ...q, value: e.target.value } : q))
+                              )
+                            }
+                            className="flex-1 bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-200 font-mono focus:border-indigo-500 focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setQueryParamsList((prev) => prev.filter((q) => q.id !== item.id))
+                            }
+                            className="p-1 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Headers */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+                      Expected Request Headers
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setHeadersList((prev) => [
+                          ...prev,
+                          { id: `hdr_${Date.now()}`, key: '', value: '' },
+                        ])
+                      }
+                      className="flex items-center gap-1 text-[11px] text-indigo-400 hover:text-indigo-300 font-medium"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Add Header</span>
+                    </button>
+                  </div>
+
+                  {headersList.length === 0 ? (
+                    <p className="text-[11px] text-slate-600 italic">No header constraints (matches all headers)</p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {headersList.map((item) => (
+                        <div key={item.id} className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            placeholder="Header-Name (e.g. x-api-key)"
+                            value={item.key}
+                            onChange={(e) =>
+                              setHeadersList((prev) =>
+                                prev.map((h) => (h.id === item.id ? { ...h, key: e.target.value } : h))
+                              )
+                            }
+                            className="flex-1 bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-200 font-mono focus:border-indigo-500 focus:outline-none"
+                          />
+                          <span className="text-slate-600 text-xs font-mono">:</span>
+                          <input
+                            type="text"
+                            placeholder="expected value"
+                            value={item.value}
+                            onChange={(e) =>
+                              setHeadersList((prev) =>
+                                prev.map((h) => (h.id === item.id ? { ...h, value: e.target.value } : h))
+                              )
+                            }
+                            className="flex-1 bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-200 font-mono focus:border-indigo-500 focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setHeadersList((prev) => prev.filter((h) => h.id !== item.id))
+                            }
+                            className="p-1 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Response Body Section with Tabs & Quick Templates */}

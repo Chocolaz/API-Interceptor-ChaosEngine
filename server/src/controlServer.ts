@@ -78,7 +78,7 @@ export class ControlPlaneServer {
     // POST /_api/mocks
     this.app.post('/_api/mocks', async (req: Request, res: Response) => {
       try {
-        const { method, path: rawPath, status, responseBody, enabled } = req.body;
+        const { method, path: rawPath, status, responseBody, enabled, delayMs, queryParams, headers } = req.body;
 
         if (!method || !rawPath) {
           res.status(400).json({ error: 'method and path are required' });
@@ -115,6 +115,9 @@ export class ControlPlaneServer {
           path: normalizedPath,
           status: Number(status) || 200,
           responseBody: parsedBody ?? {},
+          delayMs: delayMs !== undefined ? Math.max(0, Number(delayMs) || 0) : undefined,
+          queryParams: typeof queryParams === 'object' && queryParams !== null ? queryParams : undefined,
+          headers: typeof headers === 'object' && headers !== null ? headers : undefined,
         });
 
         res.json(newMock);
@@ -166,6 +169,18 @@ export class ControlPlaneServer {
             }
           }
           updates.responseBody = parsed;
+        }
+
+        if (req.body.delayMs !== undefined) {
+          updates.delayMs = Math.max(0, Number(req.body.delayMs) || 0);
+        }
+
+        if (req.body.queryParams !== undefined) {
+          updates.queryParams = typeof req.body.queryParams === 'object' && req.body.queryParams !== null ? req.body.queryParams : undefined;
+        }
+
+        if (req.body.headers !== undefined) {
+          updates.headers = typeof req.body.headers === 'object' && req.body.headers !== null ? req.body.headers : undefined;
         }
 
         const updated = await store.updateMock(id, updates);
