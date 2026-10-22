@@ -219,11 +219,22 @@ export class ControlPlaneServer {
     // Production: serve built client assets if available
     const clientDistPath = path.resolve(__dirname, '../../client/dist');
     if (fs.existsSync(clientDistPath)) {
-      this.app.use(express.static(clientDistPath));
+      this.app.use(
+        express.static(clientDistPath, {
+          setHeaders: (res) => {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+          },
+        })
+      );
       this.app.get('*', (req: Request, res: Response, next: NextFunction) => {
         if (req.path.startsWith('/_api') || req.path.startsWith('/socket.io')) {
           return next();
         }
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
         res.sendFile(path.join(clientDistPath, 'index.html'));
       });
     }
