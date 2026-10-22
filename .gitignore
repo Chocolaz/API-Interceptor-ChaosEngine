@@ -12,6 +12,12 @@ build/
 # Local data (config state)
 server/data/config.json
 
+# Agent skills & local workspace customizations
+.agents/
+.agent/
+_agents/
+_agent/
+
 # Logs & temporary files
 *.log
 *.tsbuildinfo
