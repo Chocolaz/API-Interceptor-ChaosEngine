@@ -262,10 +262,24 @@ export class ProxyIngressServer {
   }
 
   public start(): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+      this.server.once('error', (err: any) => {
+        if (err.code === 'EADDRINUSE') {
+          console.error(`\n❌ [Proxy Ingress] Port ${this.port} is already in use by another process!`);
+          console.error(`👉 Run this in PowerShell to free it:`);
+          console.error(`   Get-Process -Id (Get-NetTCPConnection -LocalPort ${this.port}).OwningProcess | Stop-Process -Force\n`);
+        }
+        reject(err);
+      });
       this.server.listen(this.port, () => {
         resolve();
       });
+    });
+  }
+
+  public stop(): Promise<void> {
+    return new Promise((resolve) => {
+      this.server.close(() => resolve());
     });
   }
 }

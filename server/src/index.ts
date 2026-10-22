@@ -2,8 +2,8 @@ import { store } from './store';
 import { ControlPlaneServer } from './controlServer';
 import { ProxyIngressServer } from './proxyServer';
 
-const CONTROL_PORT = 3001;
-const PROXY_PORT = 4000;
+const CONTROL_PORT = Number(process.env.CONTROL_PORT) || 3001;
+const PROXY_PORT = Number(process.env.PROXY_PORT) || 4000;
 
 async function bootstrap() {
   try {
@@ -26,6 +26,25 @@ async function bootstrap() {
 
     await proxyServer.start();
     console.log(`[Proxy Ingress] Running on http://localhost:${PROXY_PORT}`);
+
+    // 5. Graceful shutdown on SIGINT / SIGTERM
+    let isShuttingDown = false;
+    const shutdown = async (signal: string) => {
+      if (isShuttingDown) return;
+      isShuttingDown = true;
+      console.log(`\n[Server] Received ${signal}. Shutting down gracefully...`);
+      try {
+        await Promise.all([controlServer.stop(), proxyServer.stop()]);
+        console.log('[Server] Ports released cleanly. Goodbye!');
+        process.exit(0);
+      } catch (err) {
+        console.error('Error during shutdown:', err);
+        process.exit(1);
+      }
+    };
+
+    process.on('SIGINT', () => shutdown('SIGINT'));
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
   } catch (error) {
     console.error('Fatal error during server startup:', error);
     process.exit(1);

@@ -1,5 +1,7 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import http from 'http';
+import fs from 'fs';
+import path from 'path';
 import { Server as SocketIOServer } from 'socket.io';
 import cors from 'cors';
 import { store } from './store';
@@ -198,6 +200,18 @@ export class ControlPlaneServer {
       this.io.emit('logs_cleared');
       res.json({ success: true });
     });
+
+    // Production: serve built client assets if available
+    const clientDistPath = path.resolve(__dirname, '../../client/dist');
+    if (fs.existsSync(clientDistPath)) {
+      this.app.use(express.static(clientDistPath));
+      this.app.get('*', (req: Request, res: Response, next: NextFunction) => {
+        if (req.path.startsWith('/_api') || req.path.startsWith('/socket.io')) {
+          return next();
+        }
+        res.sendFile(path.join(clientDistPath, 'index.html'));
+      });
+    }
   }
 
   public emitTrafficLog(log: TrafficLog): void {
@@ -205,10 +219,24 @@ export class ControlPlaneServer {
   }
 
   public start(): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+      this.server.once('error', (err: any) => {
+        if (err.code === 'EADDRINUSE') {
+          console.error(`\n❌ [Control Plane] Port ${this.port} is already in use by another process!`);
+          console.error(`👉 Run this in PowerShell to free it:`);
+          console.error(`   Get-Process -Id (Get-NetTCPConnection -LocalPort ${this.port}).OwningProcess | Stop-Process -Force\n`);
+        }
+        reject(err);
+      });
       this.server.listen(this.port, () => {
         resolve();
       });
+    });
+  }
+
+  public stop(): Promise<void> {
+    return new Promise((resolve) => {
+      this.server.close(() => resolve());
     });
   }
 }
