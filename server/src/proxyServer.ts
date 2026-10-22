@@ -152,6 +152,7 @@ export class ProxyIngressServer {
           durationMs,
           source: 'MOCK',
           requestBody,
+          responseBody: matchedMock.responseBody,
         });
 
         res.status(matchedMock.status || 200).json(matchedMock.responseBody);
@@ -165,19 +166,46 @@ export class ProxyIngressServer {
           target: targetUrl,
           changeOrigin: true,
           on: {
-            proxyReq: fixRequestBody,
+            proxyReq: (proxyReq, pReq) => {
+              // Ask upstream for plaintext/uncompressed data so we can parse JSON
+              proxyReq.setHeader('accept-encoding', 'identity');
+              fixRequestBody(proxyReq, pReq);
+            },
             proxyRes: (proxyRes: IncomingMessage) => {
               const durationMs = Date.now() - startTime;
-              this.emitLog({
-                id: generateLogId(),
-                timestamp: new Date().toISOString(),
-                method: reqMethod,
-                path: reqPath,
-                query,
-                status: proxyRes.statusCode || 200,
-                durationMs,
-                source: 'PROXY',
-                requestBody,
+              const chunks: Buffer[] = [];
+
+              proxyRes.on('data', (chunk) => {
+                chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+              });
+
+              proxyRes.on('end', () => {
+                let capturedResponseBody: any = undefined;
+                try {
+                  const raw = Buffer.concat(chunks).toString('utf-8');
+                  if (raw && raw.trim()) {
+                    try {
+                      capturedResponseBody = JSON.parse(raw);
+                    } catch {
+                      capturedResponseBody = raw;
+                    }
+                  }
+                } catch {
+                  // ignore
+                }
+
+                this.emitLog({
+                  id: generateLogId(),
+                  timestamp: new Date().toISOString(),
+                  method: reqMethod,
+                  path: reqPath,
+                  query,
+                  status: proxyRes.statusCode || 200,
+                  durationMs,
+                  source: 'PROXY',
+                  requestBody,
+                  responseBody: capturedResponseBody,
+                });
               });
             },
             error: (_err: Error, _pReq: IncomingMessage, pRes: ServerResponse | any) => {

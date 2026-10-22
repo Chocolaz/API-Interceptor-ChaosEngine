@@ -9,6 +9,7 @@ interface MockModalProps {
   initialMock?: MockRoute | null;
   defaultMethod?: HttpMethod;
   defaultPath?: string;
+  defaultResponseBody?: any;
 }
 
 const METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
@@ -20,6 +21,7 @@ export default function MockModal({
   initialMock,
   defaultMethod,
   defaultPath,
+  defaultResponseBody,
 }: MockModalProps) {
   const [method, setMethod] = useState<HttpMethod>('GET');
   const [path, setPath] = useState('');
@@ -40,10 +42,18 @@ export default function MockModal({
       setMethod(defaultMethod || 'GET');
       setPath(defaultPath || '');
       setStatus(200);
-      setResponseBodyText('{\n  "message": "success"\n}');
+      if (defaultResponseBody !== undefined) {
+        setResponseBodyText(
+          typeof defaultResponseBody === 'object'
+            ? JSON.stringify(defaultResponseBody, null, 2)
+            : String(defaultResponseBody)
+        );
+      } else {
+        setResponseBodyText('{\n  "message": "success"\n}');
+      }
       setJsonError(null);
     }
-  }, [initialMock, defaultMethod, defaultPath, isOpen]);
+  }, [initialMock, defaultMethod, defaultPath, defaultResponseBody, isOpen]);
 
   // Validate JSON on every change
   const handleBodyChange = (text: string) => {

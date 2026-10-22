@@ -229,9 +229,22 @@ export default function LiveInspector({
                       </div>
                     )}
 
-                    {!log.requestBody && (!log.query || Object.keys(log.query).length === 0) && (
+                    {log.responseBody !== undefined && (
+                      <div>
+                        <span className="text-slate-500 text-[11px] uppercase tracking-wider block mb-1">
+                          Response Body (Captured):
+                        </span>
+                        <pre className="bg-slate-950 p-2 rounded border border-slate-800/80 overflow-x-auto text-[11px] text-purple-300">
+                          {typeof log.responseBody === 'object'
+                            ? JSON.stringify(log.responseBody, null, 2)
+                            : String(log.responseBody)}
+                        </pre>
+                      </div>
+                    )}
+
+                    {!log.requestBody && log.responseBody === undefined && (!log.query || Object.keys(log.query).length === 0) && (
                       <div className="text-slate-500 text-[11px] italic">
-                        No request body or query parameters attached.
+                        No request body, response body, or query parameters attached.
                       </div>
                     )}
                   </div>

@@ -35,4 +35,5 @@ export interface TrafficLog {
   durationMs: number;
   source: ResolutionSource;
   requestBody?: any;
+  responseBody?: any;
 }

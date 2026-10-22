@@ -29,6 +29,7 @@ export default function App() {
   const [editingMock, setEditingMock] = useState<MockRoute | null>(null);
   const [modalDefaultMethod, setModalDefaultMethod] = useState<HttpMethod>('GET');
   const [modalDefaultPath, setModalDefaultPath] = useState<string>('');
+  const [modalDefaultResponseBody, setModalDefaultResponseBody] = useState<any>(undefined);
 
   // 1. Load initial config from Control Plane API
   const fetchConfig = useCallback(async () => {
@@ -104,16 +105,18 @@ export default function App() {
   };
 
   // Open Create Mock Modal
-  const handleOpenCreateModal = (defaultMethod?: HttpMethod, defaultPath?: string) => {
+  const handleOpenCreateModal = (defaultMethod?: HttpMethod, defaultPath?: string, defaultBody?: any) => {
     setEditingMock(null);
     setModalDefaultMethod(defaultMethod || 'GET');
     setModalDefaultPath(defaultPath || '');
+    setModalDefaultResponseBody(defaultBody);
     setIsModalOpen(true);
   };
 
   // Open Edit Mock Modal
   const handleOpenEditModal = (mock: MockRoute) => {
     setEditingMock(mock);
+    setModalDefaultResponseBody(undefined);
     setIsModalOpen(true);
   };
 
@@ -123,6 +126,7 @@ export default function App() {
     setEditingMock(null);
     setModalDefaultMethod(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(validMethod) ? validMethod : 'GET');
     setModalDefaultPath(log.path);
+    setModalDefaultResponseBody(log.responseBody);
     setIsModalOpen(true);
   };
 
@@ -261,6 +265,7 @@ export default function App() {
         initialMock={editingMock}
         defaultMethod={modalDefaultMethod}
         defaultPath={modalDefaultPath}
+        defaultResponseBody={modalDefaultResponseBody}
       />
     </div>
   );
