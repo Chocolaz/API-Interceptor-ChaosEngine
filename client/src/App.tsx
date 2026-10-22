@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
+import { io as createSocketIOClient, Socket } from 'socket.io-client';
 import ChaosPanel from './components/ChaosPanel';
 import MockList from './components/MockList';
 import MockModal from './components/MockModal';
-import { AppConfig, ChaosConfig, MockRoute, HttpMethod } from './types';
+import LiveInspector from './components/LiveInspector';
+import { AppConfig, ChaosConfig, MockRoute, HttpMethod, TrafficLog } from './types';
 
 const DEFAULT_CONFIG: AppConfig = {
   targetUrl: '',
@@ -16,8 +18,11 @@ const DEFAULT_CONFIG: AppConfig = {
   mocks: [],
 };
 
+const MAX_LOGS = 100;
+
 export default function App() {
   const [config, setConfig] = useState<AppConfig>(DEFAULT_CONFIG);
+  const [trafficLogs, setTrafficLogs] = useState<TrafficLog[]>([]);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -25,7 +30,7 @@ export default function App() {
   const [modalDefaultMethod, setModalDefaultMethod] = useState<HttpMethod>('GET');
   const [modalDefaultPath, setModalDefaultPath] = useState<string>('');
 
-  // Load initial config from Control Plane API
+  // 1. Load initial config from Control Plane API
   const fetchConfig = useCallback(async () => {
     try {
       const res = await fetch('/_api/config');
@@ -41,6 +46,26 @@ export default function App() {
   useEffect(() => {
     fetchConfig();
   }, [fetchConfig]);
+
+  // 2. Setup Real-time WebSocket connection to Control Plane (Port 3001)
+  useEffect(() => {
+    // In dev, Vite proxies /socket.io to Port 3001. In prod, served directly.
+    const socket: Socket = createSocketIOClient({
+      transports: ['websocket', 'polling'],
+    });
+
+    socket.on('traffic_log', (log: TrafficLog) => {
+      setTrafficLogs((prev) => [log, ...prev.slice(0, MAX_LOGS - 1)]);
+    });
+
+    socket.on('logs_cleared', () => {
+      setTrafficLogs([]);
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
 
   // Update Chaos settings
   const handleUpdateChaos = async (newChaos: ChaosConfig) => {
@@ -92,6 +117,25 @@ export default function App() {
     setIsModalOpen(true);
   };
 
+  // 1-Click Action from Live Inspector ("Mock This")
+  const handleMockThis = (log: TrafficLog) => {
+    const validMethod = log.method.toUpperCase() as HttpMethod;
+    setEditingMock(null);
+    setModalDefaultMethod(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(validMethod) ? validMethod : 'GET');
+    setModalDefaultPath(log.path);
+    setIsModalOpen(true);
+  };
+
+  // Clear Traffic Logs
+  const handleClearLogs = async () => {
+    setTrafficLogs([]);
+    try {
+      await fetch('/_api/logs/clear', { method: 'POST' });
+    } catch (err) {
+      console.error('Failed to clear traffic logs on server:', err);
+    }
+  };
+
   // Save Mock (Create or Update)
   const handleSaveMock = async (mockData: Omit<MockRoute, 'id'>, id?: string) => {
     if (id) {
@@ -136,7 +180,6 @@ export default function App() {
   // Toggle Mock Enabled
   const handleToggleMock = async (mock: MockRoute) => {
     const updatedEnabled = !mock.enabled;
-    // Optimistic update
     setConfig((prev) => ({
       ...prev,
       mocks: prev.mocks.map((m) => (m.id === mock.id ? { ...m, enabled: updatedEnabled } : m)),
@@ -149,7 +192,6 @@ export default function App() {
         body: JSON.stringify({ enabled: updatedEnabled }),
       });
       if (!res.ok) {
-        // Revert on failure
         fetchConfig();
       }
     } catch (err) {
@@ -160,7 +202,6 @@ export default function App() {
 
   // Delete Mock
   const handleDeleteMock = async (id: string) => {
-    // Optimistic delete
     setConfig((prev) => ({
       ...prev,
       mocks: prev.mocks.filter((m) => m.id !== id),
@@ -189,7 +230,7 @@ export default function App() {
         onUpdateTarget={handleUpdateTarget}
       />
 
-      {/* Main Split View */}
+      {/* Main Split View (2 Columns 50% / 50%) */}
       <main className="flex-1 overflow-hidden flex divide-x divide-slate-800">
         {/* Left Column (50%): Mock Routes Manager */}
         <section className="w-1/2 flex flex-col overflow-hidden">
@@ -202,16 +243,13 @@ export default function App() {
           />
         </section>
 
-        {/* Right Column (50%): Live Traffic Inspector (Placeholder for Commit 4) */}
-        <section className="w-1/2 p-6 flex flex-col bg-slate-950">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300">
-              Live Traffic (Port 4000)
-            </h2>
-          </div>
-          <div className="flex-1 flex items-center justify-center text-xs text-slate-500">
-            LiveInspector component will be mounted here in Commit 4
-          </div>
+        {/* Right Column (50%): Live Traffic Stream Inspector */}
+        <section className="w-1/2 flex flex-col overflow-hidden">
+          <LiveInspector
+            logs={trafficLogs}
+            onClearLogs={handleClearLogs}
+            onMockThis={handleMockThis}
+          />
         </section>
       </main>
 
